@@ -1,0 +1,4 @@
+train_bin: data/Prepared/TinyStories/train.bin
+val_bin:   data/Prepared/TinyStories/val.bin
+context_length: 256
+dtype: uint16

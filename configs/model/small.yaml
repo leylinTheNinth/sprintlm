@@ -1,0 +1,6 @@
+vocab_name: gpt2                #  vocab size from tokenizer at runtime
+d_model: 384
+num_layers: 12
+num_heads: 6
+d_ff: 1536
+theta: 10000.0

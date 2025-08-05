@@ -1,0 +1,11 @@
+defaults:
+  - dataset: local
+  - model: small
+  - train: micro
+
+seed: 7
+device: auto            # auto -> mps -> cuda -> cpu
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}

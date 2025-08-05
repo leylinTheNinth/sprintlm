@@ -1,0 +1,6 @@
+train_txt: data/raw/tinystoriestrain.txt
+val_txt:   data/raw/tinystoriesval.txt
+out_dir:   data/Prepared/TinyStories
+append_eot: false                
+dtype: uint16                   # GPT-2 vocab fits into uint16
+tokenizer_name: gpt2            # tiktoken encoding

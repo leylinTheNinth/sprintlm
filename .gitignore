@@ -1,0 +1,73 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+*.pyd
+*.so
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+
+# Virtual environments
+.venv
+.env
+venv/
+env/
+
+# uv specific
+.uv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# ML/Data Science specific
+data/
+datasets/
+*.bin
+*.jsonl
+*.txt
+*.csv
+*.tsv
+
+# Model artifacts
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+checkpoints/
+models/
+model_outputs/
+
+# Training outputs
+outputs/
+logs/
+runs/
+wandb/
+.wandb/
+mlruns/
+
+# Hydra
+.hydra/
+multirun/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# OS generated files
+Thumbs.db
+.directory
