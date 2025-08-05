@@ -55,17 +55,20 @@ def learning_rate_scheduler(
 #careful this is not per parameter clipping but on whole gradient vector
 def gradient_clip(parameters, max_l2_norm: float) -> None:
     eps = 1e-6  #default
-    total_norm = 0.0
+    total_sq = 0.0
     params_with_grad = []    
-    for param in parameters:
-        if param.grad is not None:
-            params_with_grad.append(param)
-            param_norm = param.grad.data.norm(dtype=torch.float32)
-            total_norm += param_norm.item() ** 2
     
-    total_norm = total_norm ** 0.5    
-    if total_norm > max_l2_norm:
-        clip_coeff = max_l2_norm / (total_norm + eps)        
-        for param in params_with_grad:
-            param.grad.data.mul_(clip_coeff)
+    for p in parameters:
+        if p.grad is None:
+            continue
+        params_with_grad.append(p)
+        # cast to fp32 explicitly; avoid dtype arg to .norm(); i guess some mps problem :(
+        g = p.grad.detach().float()
+        total_sq += float(g.norm(2).item()) ** 2
 
+    total_norm = math.sqrt(total_sq)
+    if total_norm > max_l2_norm:
+        clip_coef = max_l2_norm / (total_norm + eps)
+        with torch.no_grad():
+            for p in params_with_grad:
+                p.grad.mul_(clip_coef)
