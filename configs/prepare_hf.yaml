@@ -1,0 +1,14 @@
+dataset_name: roneneldan/TinyStories     
+train_split: train
+val_split: validation
+
+text_field: text                         
+out_dir: data/Prepared/TinyStoriesHF
+
+append_eot: true                         
+dtype: uint16
+tokenizer_name: gpt2
+
+# limits for quick tests (null = use full split)
+max_records_train: null
+max_records_val: null

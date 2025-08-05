@@ -1,8 +1,9 @@
 from __future__ import annotations
-import os, time, math, csv, numpy as np, torch
+import sys, os, time, math, csv, numpy as np, torch
 from pathlib import Path
 import hydra
 from hydra.utils import to_absolute_path
+from hydra.core.hydra_config import HydraConfig  
 from omegaconf import DictConfig, OmegaConf
 
 from sprintlm.model.transformer import Transformer
@@ -23,9 +24,30 @@ def pick_device(auto: str) -> str:
 def tokens_per_step(batch_size: int, context_length: int) -> int:
     return batch_size * context_length
 
+
+try:
+    sys.stdout.reconfigure(line_buffering=True) # type: ignore
+except Exception:
+    pass
+
 @hydra.main(config_path="../../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
+    run_dir = Path(HydraConfig.get().runtime.output_dir).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"[run] output_dir = {run_dir}", flush=True)
+    print(f"[run] metrics -> {run_dir / 'metrics.csv'}", flush=True)
+    print(f"[run] ckpts   -> {run_dir / cfg.train.ckpt_dir}", flush=True)
+
+    log_file = open(run_dir / "console.log", "a", buffering=1)  
+    def log(msg: str):
+        print(msg, flush=True)
+        try:
+            log_file.write(msg + "\n")
+        except Exception:
+            pass
+
     torch.manual_seed(cfg.seed)
     device = pick_device(cfg.get("device", "auto"))
     print(f"[info] device = {device}")
@@ -68,17 +90,24 @@ def main(cfg: DictConfig):
         print(f"[info] resumed from {cfg.train.resume_from} @ step {step}")
 
     # CSV metrics
-    csv_f = open("metrics.csv", "w", newline="")
+    csv_path = run_dir / "metrics.csv"
+    csv_f = open(csv_path, "w", newline="")
     csv_w = csv.DictWriter(csv_f,
         fieldnames=["step","train_loss","val_loss","ppl","lr","tok_per_s","epoch_equiv"])
     csv_w.writeheader(); csv_f.flush()
 
-    ckpt_dir = Path(cfg.train.ckpt_dir); ckpt_dir.mkdir(parents=True, exist_ok=True)
+    ckpt_dir = (run_dir / cfg.train.ckpt_dir)
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
     best_val = float("inf")
     t_last = time.time()
     TOK_STEP = tokens_per_step(cfg.train.batch_size, cfg.dataset.context_length)
     seen_tokens = step * TOK_STEP
     N_TOK = len(train_tokens)
+
+    # rolling window for smoother tok/s (reduces jitter, less ETA spam)
+    window_tokens = 0
+    window_time = 0.0
+    log_count = 0  # for infrequent CSV flushes
 
     # ===== loop =====
     while step < cfg.train.max_steps:
@@ -111,11 +140,32 @@ def main(cfg: DictConfig):
         tokps = TOK_STEP / max(dt, 1e-9)
         epoch_eq = seen_tokens / max(N_TOK, 1)
 
+        window_tokens += TOK_STEP
+        window_time += dt
+
         if step % cfg.train.log_every == 0:
-            print(f"step {step:5d}  loss {loss.item():.4f}  lr {lr:.2e}  tok/s {tokps/1e3:5.1f}k  epoch≈{epoch_eq:.3f}")
-            csv_w.writerow({"step": step, "train_loss": loss.item(), "val_loss": "", "ppl": "", "lr": lr,
-                            "tok_per_s": tokps, "epoch_equiv": epoch_eq})
-            csv_f.flush()
+            # average tok/s over the window
+            tokps_avg = window_tokens / max(window_time, 1e-9)
+            steps_per_s = tokps_avg / float(TOK_STEP)
+            remaining = cfg.train.max_steps - step
+            eta_sec = remaining / max(steps_per_s, 1e-9)
+            eta_min = int(eta_sec // 60); eta_hr = eta_min // 60; eta_min %= 60
+
+            log(f"step {step:5d}  loss {loss.item():.4f}  lr {lr:.2e}  "
+                f"tok/s {tokps_avg/1e3:4.1f}k  epoch≈{epoch_eq:.3f}")
+            log(f"ETA → {cfg.train.max_steps} steps: ~{eta_hr}h {eta_min}m  "
+                f"at {steps_per_s:.3f} steps/s ({tokps_avg:,.0f} tok/s)")
+
+            csv_w.writerow({
+                "step": step, "train_loss": loss.item(), "val_loss": "", "ppl": "",
+                "lr": lr, "tok_per_s": tokps_avg, "epoch_equiv": epoch_eq
+            })
+            log_count += 1
+            if log_count % 5 == 0:   
+                csv_f.flush()
+            # reset window
+            window_tokens = 0
+            window_time = 0.0
 
         if step % cfg.train.eval_every == 0:
             model.eval()
@@ -123,7 +173,7 @@ def main(cfg: DictConfig):
                 vx, vy = get_batch(val_tokens, cfg.train.batch_size, cfg.dataset.context_length, device=device)
                 vloss = cross_entropy_loss(model(vx), vy).item()
             ppl = math.exp(min(20.0, vloss))      # guard overflow
-            print(f"[eval] step {step:5d}  val_loss {vloss:.4f}  ppl {ppl:.2f}")
+            log(f"[eval] step {step:5d}  val_loss {vloss:.4f}  ppl {ppl:.2f}")
             csv_w.writerow({"step": step, "train_loss": "", "val_loss": vloss, "ppl": ppl, "lr": lr,
                             "tok_per_s": tokps, "epoch_equiv": epoch_eq})
             csv_f.flush()
@@ -132,17 +182,17 @@ def main(cfg: DictConfig):
                 best_val = vloss
                 out = ckpt_dir / f"best_step{step}_val{vloss:.3f}.pt"
                 save_checkpoint(model, opt, step, out)
-                print(f"[ckpt] saved {out}")
+                log(f"[ckpt] saved {out}")
 
         if step % cfg.train.save_every == 0:
             out = ckpt_dir / f"step{step}.pt"
             save_checkpoint(model, opt, step, out)
-            print(f"[ckpt] saved {out}")
+            log(f"[ckpt] saved {out}")
 
     # final
     out = ckpt_dir / f"final_step{step}.pt"
     save_checkpoint(model, opt, step, out)
-    print(f"[done] saved {out}")
+    log(f"[done] saved {out}")
 
 if __name__ == "__main__":
     main()

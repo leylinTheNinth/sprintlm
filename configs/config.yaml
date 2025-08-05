@@ -2,6 +2,7 @@ defaults:
   - dataset: local
   - model: small
   - train: micro
+  - _self_
 
 seed: 7
 device: auto            # auto -> mps -> cuda -> cpu

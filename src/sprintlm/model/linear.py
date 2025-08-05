@@ -11,6 +11,7 @@ class Linear(nn.Module):
         self.weight = nn.Parameter(nn.init.trunc_normal_(w, 0, sigma, -3*sigma, 3*sigma))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        y = einops.einsum(x, self.weight, "... d_in, d_out d_in -> ... d_out")
+      #  y = einops.einsum(x, self.weight, "... d_in, d_out d_in -> ... d_out")
+        y = x@self.weight.t() # let's see if this speeds up
         return y
     

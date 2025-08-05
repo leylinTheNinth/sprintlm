@@ -1,4 +1,4 @@
-train_bin: data/Prepared/TinyStories/train.bin
-val_bin:   data/Prepared/TinyStories/val.bin
+train_bin: data/Prepared/TinyStoriesHF/train.bin
+val_bin:   data/Prepared/TinyStoriesHF/val.bin
 context_length: 256
 dtype: uint16
