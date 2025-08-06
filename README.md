@@ -26,3 +26,6 @@ uv run python tools/decode_cli.py \
   --ckpt outputs/<RUN>/ckpts/step5000.pt \
   --prompt "Once upon a time, " --context_length 192 \
   --temperature 0.8 --top_k 40
+```
+### Acknowledgments
+SprintLM is extension of the public **Stanford CS336 — Assignment 1: “Transformers from Scratch.”**. 
