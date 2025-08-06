@@ -34,8 +34,8 @@ env/
 .ipynb_checkpoints/
 
 # ML/Data Science specific
-data/
-datasets/
+/data/
+/datasets/
 *.bin
 *.jsonl
 *.txt
